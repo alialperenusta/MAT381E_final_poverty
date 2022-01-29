@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="" xml:lang="">
+  <head>
+    <title>MAT 381E-Final Presentation</title>
+    <meta charset="utf-8" />
+    <meta name="author" content="Ali Alperen Usta &amp; Kaan Kaymaz poverty" />
+    <script src="libs/header-attrs-2.11/header-attrs.js"></script>
+    <link href="libs/remark-css-0.0.1/default.css" rel="stylesheet" />
+    <link href="libs/remark-css-0.0.1/default-fonts.css" rel="stylesheet" />
+  </head>
+  <body>
+    <textarea id="source">
+class: center, middle, inverse, title-slide
+
+# MAT 381E-Final Presentation
+## Children Poverty in the World
+### Ali Alperen Usta &amp; Kaan Kaymaz<br/>poverty
+### Department of Mathematics<br/>Istanbul Technical University
+### 29/01/2022
+
+---
+
+
+# Poverty
+
+- **Poverty** is a state or condition in which a person or community lacks the financial resources and essentials for a minimum standard of living. Poverty   means that the income level from employment is so low that basic human needs can't be met. Poverty-stricken people and families might go without        proper housing, clean water, healthy food, and medical attention. 
+
+- Children are more than twice as likely to live in poverty than adults. Children from the poorest households die at twice the rate of their better-off peers.
+
+
+
+
+
+---
+# Indicators of Poverty
+
+According to Multidimensional Poverty Index which is specified in surveys of Sustainable Development Solutions Network (SDSN), there are 9 items that are indicators of poverty.  
+
+1.	Adult or child malnourishment  
+2.	Disrupted or curtailed schooling (a minimum of years 1-8)  
+3.	The absence of any household member who has completed 6 years of schooling     
+4.	Child mortality within the household within the last 5 years   
+5.	Lack of access to safe drinking water     
+6.	Lack of access to basic sanitation services      
+7.	Lack of access to clean cooking fuel    
+8.	Lack of basic modern assets (radio, TV, telephone, computer, bike, motorbike, etc.)    
+9.	Lack of access to reliable electricity     
+
+
+---
+
+
+
+.pull-left[
+# Aim of Project
+
+-  This project aims to examine the living conditions, economic situation and educational status of children in the world. With this project, it is aimed to point out that **child poverty** is a huge problem for the world.
+
+-  The project examines the connection of these problems with the level of development of the countries according to different data such as mortality, education, water services.
+
+
+
+]
+
+.pull-right[
+
+![](https://www.unicef.org/sites/default/files/styles/hero_mobile/public/UNI112437.jpg?itok=gJh6vbn0)&lt;!-- --&gt;
+- The purpose of the project is achieved by transforming the relevant data into graphical information.
+]
+---
+## Introduction to Data
+
+- There are 3 basic data used in this project to detect child poverty.  
+
+1. Mortality
+2. Education
+3. Water Services  
+
+- Data was collected from UNICEF, an organization dedicated to reducing child poverty around the world. 
+
+- The data show the situation of the countries according to the researches made according to certain years.    
+
+- It can be can accessed the data from the reference section on the last page.
+
+
+
+
+
+
+---
+
+#Data Preparation 
+
+```r
+library(readxl)
+# This library is used to import data to R.  
+
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+# These libraries are used to manipulate data. 
+
+library(ggplot2)
+library(patchwork)
+# These libraries are used to visualize data.  
+
+library(sf)
+library(leaflet)
+# These libraries are used to use spatial data.
+```
+
+---
+
+### Importing Data
+
+
+
+```r
+mortality&lt;-read_excel("data/Table-2-Child-Mortality-EN.xlsx")
+str(mortality)
+```
+
+
+```r
+education&lt;-read_excel("data/Table-10-Education-EN.xlsx")
+```
+
+
+```r
+wash&lt;-read_excel("data/Table-13-WASH-EN.xlsx")
+```
+
+
+```r
+dev_data&lt;-read_excel("data/comparedata.xlsx")%&gt;%
+  slice(-c(1))%&gt;%     
+  select("Development Regions")
+```
+---
+# Dirty Data
+
+![](image/mortality_first.jpeg)&lt;!-- --&gt;
+
+
+
+
+---
+
+## Cleaning and Reshaping
+
+The code that manipulates the mortality data is below 
+
+```r
+not_all_na &lt;- function(mortality) any(!is.na(mortality))
+  
+mortality_tidy &lt;-   
+  mortality %&gt;%   
+  filter_all(any_vars(! is.na(.))) %&gt;%
+  select(where(not_all_na)) %&gt;%       
+  
+  select(1:4|6:9|13:14) %&gt;%       
+  rename("Countries"="TABLE 2. CHILD MORTALITY",
+         "Under_5_1990"="...2",
+         "Under_5_2000"="...4",
+         "Under_5_2018"="...6",
+         "Under_5_male_rate_2018"="...10",
+         "Under_5_female_rate_2018"="...12",
+         "Infant_1990"="...14",
+         "Infant_2018"="...16",
+         "Dying_5_14_1990"="...24",
+         "Dying_5_14_2018"="...26") %&gt;%
+         slice(c(3:204)) %&gt;%
+         mutate(dev_data,.after="Countries") 
+```
+
+---
+# Tidy Data
+![](image/mortality_tidy.jpeg)&lt;!-- --&gt;
+
+---
+# Data Visualization
+
+5 different types of graphics were used in this project.
+- **The graphs used are:**   
+    - Boxplot    
+    - Pie Chart     
+    - Scatter Graph  
+    - Spatial Mapping
+    - Bar Graph
+
+
+---
+## Boxplot Code
+
+
+```r
+graph_1990 &lt;-
+mortality_tidy %&gt;%
+  ggplot(aes(x=`Development Regions`,y=Under_5_1990)) +
+  geom_boxplot(fill="#34967d") +
+  labs(x = "Development Levels", y = "Deaths",
+       title = "Under-5 Mortality Rate in 1990 (per 1000 live births)")+
+   theme(axis.title =element_text(size = 15, color = "#ad4e4e", face = "italic"),
+         axis.text = element_text(size = 11, color = "#616d77", face="bold"),
+         plot.title = element_text(size = 15, color="#8f3d3e" ,face = "italic"),
+         panel.background = element_rect(fill="coral"),
+         plot.background = element_rect(fill="#cedfd5"))
+ 
+
+graph_1990
+```
+
+
+---
+
+class:center
+## Boxplot
+
+
+.pull-left[
+&lt;img src="image/image1.png" width="933" /&gt;
+&lt;img src="image/image3.png" width="933" /&gt;
+
+
+]
+.pull-right[
+&lt;img src="image/image2.png" width="933" /&gt;
+
+]
+
+---
+
+
+## PieChart Code
+
+
+```r
+pie1&lt;-ggplot(mort_1,aes(x="",y=avg_Under_5_female,fill=`Development Regions`))+
+  geom_bar(width=0.7,stat="identity")+
+   labs(y="y", title="Mean of Under-5 Female Mortality" ,subtitle="(deaths per 1000 live births)")+
+  theme(plot.title = element_text(size = 14, color="red",face = "bold" )) +
+  geom_label(aes(label=avg_Under_5_female),
+             position = position_stack(vjust = 0.5),
+             show.legend = FALSE) +
+  scale_fill_brewer(palette="PuRd")+
+  theme_void() +
+  coord_polar(theta = "y") 
+
+#pie2 same
+
+pie1+pie2
+```
+
+---
+
+## PieChart
+
+&lt;img src="image/image4.png" width="933" /&gt;
+
+
+
+---
+## Scatter Graph Code
+
+```r
+least_graph1&lt;-
+  mortality_tidy %&gt;%
+  filter(`Development Regions` == "Least Developed") %&gt;%
+  mutate(`Countries`=fct_reorder(`Countries`,Under_5_1990))%&gt;%
+  ggplot(aes(Under_5_1990,`Countries`))+
+  labs(y="Least Developed Countries",x="Mortality Rate",
+       title="Under-5 Mortality Rate in 1990",
+       subtitle="(deaths per 1000 live)")+
+  geom_point(color="turquoise4",shape=19) +
+  theme(axis.text.x = element_text(size=11,face="bold",color="#aa5a4f"),
+        axis.text.y = element_text(size=5,face="bold",color="#aa5a4f"),
+        axis.line.x = element_line(color="black"),
+        axis.line.y = element_line(color="black"),
+        axis.title.y=element_text(color="darkslategrey"),
+        axis.title.x=element_text(color="gray42"),
+        plot.title=element_text(color="#407328",hjust=0.5,size=16),
+        plot.subtitle=element_text(color="#407328",hjust=0.5,size=16),
+        panel.background = element_rect(fill="#C8BA5B"),
+          plot.background = element_rect(fill="#cedfd5"))+
+  scale_x_continuous(breaks=seq(0,400,20))
+
+least_graph1
+```
+
+
+
+---
+## Scatter Plot
+&lt;img src="image/image5.png" width="100%" height="80%" /&gt;
+
+---
+## Scatter Plot
+&lt;img src="image/image6.png" width="100%" height="80%" /&gt;
+---
+## Scatter Plot
+&lt;img src="image/image7.png" width="100%" height="80%" /&gt;
+---
+## Scatter Plot
+&lt;img src="image/image8.png" width="100%" height="80%" /&gt;
+---
+## Scatter Plot
+&lt;img src="image/image9.png" width="100%" height="80%" /&gt;
+---
+## Scatter Plot
+&lt;img src="image/image10.png" width="100%" height="80%" /&gt;
+
+---
+
+
+
+
+
+
+
+
+## Spatial Data
+
+
+
+
+```r
+world_data&lt;- st_read("data/world-administrative-boundaries.shp")
+```
+
+
+```r
+world_data_1&lt;-world_data %&gt;%
+  rename(Countries="name")
+```
+
+
+
+```r
+world_data_2&lt;-world_data_1 %&gt;%
+  select(Countries) %&gt;%
+  arrange(Countries)
+```
+
+
+
+
+
+```r
+education_tidy &lt;- education_tidy %&gt;%
+  arrange(Countries)
+```
+
+
+
+```r
+merged_data_1&lt;-merge(world_data_2,education_tidy)
+```
+
+---
+
+## Spatial Mapping
+
+```r
+out_of_school_color &lt;- colorFactor(
+  palette=c("#025F06","#579C5A","#88A389"),
+  domain= merged_data_1$`Development Regions`, 
+  levels = c("More Developed","Less Developed","Least Developed"),
+  ordered = TRUE)
+```
+
+
+```r
+out_of_school_labels &lt;-
+  sprintf("&lt;strong&gt;%s&lt;/strong&gt;&lt;br&gt;%s&lt;br&gt;Out of School primary male: %s &lt;br&gt; Out of School primary female:%s",merged_data_1$Countries,merged_data_1$`Development Regions`,
+          merged_data_1$Out_of_school_primary_male,
+          merged_data_1$Out_of_school_primary_female) %&gt;%
+  lapply(htmltools::HTML)
+```
+
+
+```r
+out_of_school_map &lt;- merged_data_1 %&gt;% leaflet() %&gt;% 
+  addPolygons
+(stroke=TRUE,color = "white",weight = 1,label=out_of_school_labels,
+              fillColor = ~out_of_school_color(`Development Regions`),
+              fillOpacity = 0.7)
+out_of_school_map
+```
+---
+## Bar Graph Code
+
+
+```r
+wash_least_plot&lt;-ggplot(wash_tidy_1,aes(reorder(Countries,Total_basic_drinking_water_services),
+               Total_basic_drinking_water_services,
+               fill=as.factor(Countries)))+
+    geom_col(color="white")+
+    theme_bw()+
+    coord_flip(clip = "off", expand = FALSE)+
+    guides( fill = FALSE) +
+    labs(title="Total Basic Drinking Water Services for Least Developed Countires", 
+         y="Total water services ", x="Least Developed Countries")+
+     geom_text(fontface = "bold",color="#2B3D5D",size=3,aes(label = paste(Total_basic_drinking_water_services,"")), hjust = 1)+
+    theme(
+    plot.title=element_text(size=11, hjust=0.5, face="bold", colour="#A330D5", vjust=-1),
+    axis.title.y=element_text(color="darkslategrey"),
+    axis.title.x=element_text(color="#6E76F0"),
+    panel.background = element_rect(fill="#EAF0DA"),
+    plot.background = element_rect(fill="#B4F7C7"))
+wash_least_plot
+```
+
+---
+
+## Bar Graph
+
+
+&lt;img src="image/image_wash1.png" width="100%" height="80%" /&gt;
+---
+
+## Bar Graph
+
+
+
+&lt;img src="image/image_wash2.png" width="100%" height="80%" /&gt;
+
+
+---
+
+## Challenges
+
+After clearing the data, the correct result for the graphs could not be obtained. Because, number values were available as character structure. The problem was fixed by doing the following actions.
+
+
+```r
+mortality_tidy[,1] &lt;- as.factor(unlist(mortality_tidy[,1]))
+mortality_tidy[,2] &lt;- as.factor(unlist(mortality_tidy[,2]))
+mortality_tidy[,3] &lt;- as.numeric(unlist(mortality_tidy[,3]))
+mortality_tidy[,4] &lt;- as.numeric(unlist(mortality_tidy[,4]))
+mortality_tidy[,5] &lt;- as.numeric(unlist(mortality_tidy[,5]))
+mortality_tidy[,6] &lt;- as.numeric(unlist(mortality_tidy[,6]))
+mortality_tidy[,7] &lt;- as.numeric(unlist(mortality_tidy[,7])) 
+mortality_tidy[,8] &lt;- as.numeric(unlist(mortality_tidy[,8]))
+mortality_tidy[,9] &lt;- as.numeric(unlist(mortality_tidy[,9]))
+mortality_tidy[,10] &lt;- as.numeric(unlist(mortality_tidy[,10]))
+mortality_tidy[,11] &lt;- as.numeric(unlist(mortality_tidy[,11]))
+```
+---
+## Conclusion 
+
+- It has been worked on mortality, education and water data.
+
+- Importing, cleaning, mutating, reshaping and visualization steps were applied.
+
+- In addition to the interim report, education and water data were analyzed.
+
+## Results
+- As a result, child poverty is a worldwide problem.
+
+- Based on the data, it can be said that poverty in developed countries is much less than in underdeveloped countries.
+
+---
+## References
+
+[1] [UNICEF Table](https://data.unicef.org/resources/dataset/sowc-2019-statistical-tables/)
+
+[2] [Spatial Data](https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/)
+
+[3] [UNICEF Data Warehouse](https://data.unicef.org/resources/data_explorer/unicef_f/?ag=UNICEF&amp;df=GLOBAL_DATAFLOW&amp;ver=1.0&amp;dq=.ED_15-24_LR..&amp;startPeriod=2016&amp;endPeriod=2022)
+
+[4] [UNICEF Research](https://data.unicef.org/topic/child-poverty/overview/) 
+
+[5] [Graph Implementations](https://ivelasq.rbind.io/blog/other-geoms/)
+
+[6] [Solution of Poverty](https://cpag.org.uk/child-poverty/solutions-poverty)
+
+[7] [Slides with Rmarkdown](https://www.youtube.com/watch?v=3n9nASHg9gc)
+
+    </textarea>
+<style data-target="print-only">@media screen {.remark-slide-container{display:block;}.remark-slide-scaler{box-shadow:none;}}</style>
+<script src="https://remarkjs.com/downloads/remark-latest.min.js"></script>
+<script>var slideshow = remark.create({
+"highlightStyle": "github",
+"highlightLines": true,
+"countIncrementalSlides": false
+});
+if (window.HTMLWidgets) slideshow.on('afterShowSlide', function (slide) {
+  window.dispatchEvent(new Event('resize'));
+});
+(function(d) {
+  var s = d.createElement("style"), r = d.querySelector(".remark-slide-scaler");
+  if (!r) return;
+  s.type = "text/css"; s.innerHTML = "@page {size: " + r.style.width + " " + r.style.height +"; }";
+  d.head.appendChild(s);
+})(document);
+
+(function(d) {
+  var el = d.getElementsByClassName("remark-slides-area");
+  if (!el) return;
+  var slide, slides = slideshow.getSlides(), els = el[0].children;
+  for (var i = 1; i < slides.length; i++) {
+    slide = slides[i];
+    if (slide.properties.continued === "true" || slide.properties.count === "false") {
+      els[i - 1].className += ' has-continuation';
+    }
+  }
+  var s = d.createElement("style");
+  s.type = "text/css"; s.innerHTML = "@media print { .has-continuation { display: none; } }";
+  d.head.appendChild(s);
+})(document);
+// delete the temporary CSS (for displaying all slides initially) when the user
+// starts to view slides
+(function() {
+  var deleted = false;
+  slideshow.on('beforeShowSlide', function(slide) {
+    if (deleted) return;
+    var sheets = document.styleSheets, node;
+    for (var i = 0; i < sheets.length; i++) {
+      node = sheets[i].ownerNode;
+      if (node.dataset["target"] !== "print-only") continue;
+      node.parentNode.removeChild(node);
+    }
+    deleted = true;
+  });
+})();
+(function() {
+  "use strict"
+  // Replace <script> tags in slides area to make them executable
+  var scripts = document.querySelectorAll(
+    '.remark-slides-area .remark-slide-container script'
+  );
+  if (!scripts.length) return;
+  for (var i = 0; i < scripts.length; i++) {
+    var s = document.createElement('script');
+    var code = document.createTextNode(scripts[i].textContent);
+    s.appendChild(code);
+    var scriptAttrs = scripts[i].attributes;
+    for (var j = 0; j < scriptAttrs.length; j++) {
+      s.setAttribute(scriptAttrs[j].name, scriptAttrs[j].value);
+    }
+    scripts[i].parentElement.replaceChild(s, scripts[i]);
+  }
+})();
+(function() {
+  var links = document.getElementsByTagName('a');
+  for (var i = 0; i < links.length; i++) {
+    if (/^(https?:)?\/\//.test(links[i].getAttribute('href'))) {
+      links[i].target = '_blank';
+    }
+  }
+})();
+// adds .remark-code-has-line-highlighted class to <pre> parent elements
+// of code chunks containing highlighted lines with class .remark-code-line-highlighted
+(function(d) {
+  const hlines = d.querySelectorAll('.remark-code-line-highlighted');
+  const preParents = [];
+  const findPreParent = function(line, p = 0) {
+    if (p > 1) return null; // traverse up no further than grandparent
+    const el = line.parentElement;
+    return el.tagName === "PRE" ? el : findPreParent(el, ++p);
+  };
+
+  for (let line of hlines) {
+    let pre = findPreParent(line);
+    if (pre && !preParents.includes(pre)) preParents.push(pre);
+  }
+  preParents.forEach(p => p.classList.add("remark-code-has-line-highlighted"));
+})(document);</script>
+
+<script>
+slideshow._releaseMath = function(el) {
+  var i, text, code, codes = el.getElementsByTagName('code');
+  for (i = 0; i < codes.length;) {
+    code = codes[i];
+    if (code.parentNode.tagName !== 'PRE' && code.childElementCount === 0) {
+      text = code.textContent;
+      if (/^\\\((.|\s)+\\\)$/.test(text) || /^\\\[(.|\s)+\\\]$/.test(text) ||
+          /^\$\$(.|\s)+\$\$$/.test(text) ||
+          /^\\begin\{([^}]+)\}(.|\s)+\\end\{[^}]+\}$/.test(text)) {
+        code.outerHTML = code.innerHTML;  // remove <code></code>
+        continue;
+      }
+    }
+    i++;
+  }
+};
+slideshow._releaseMath(document);
+</script>
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+(function () {
+  var script = document.createElement('script');
+  script.type = 'text/javascript';
+  script.src  = 'https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-MML-AM_CHTML';
+  if (location.protocol !== 'file:' && /^https?:/.test(script.src))
+    script.src  = script.src.replace(/^https?:/, '');
+  document.getElementsByTagName('head')[0].appendChild(script);
+})();
+</script>
+  </body>
+</html>

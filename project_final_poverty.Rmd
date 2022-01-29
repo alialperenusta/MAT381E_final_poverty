@@ -1,0 +1,837 @@
+---
+title: "Child Poverty in the World"
+author: "*poverty*"
+date: "29/01/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+# Project Final Report 
+
+
+## Team Members  
+Kaan Kaymaz 090180333  
+Ali Alperen Usta 090180323 
+  
+---
+
+\newpage
+
+# Project Description
+There are several issues that is important for world and people. When choosing topic, a couple of issues were tried to be brought together. The most interesting of these subjects was poverty. The different aspects of poverty made this subject focusable. Chen states that "Poverty is a state or condition in which a person or community lacks the financial resources and essentials for a minimum standard of living. Poverty means that the income level from employment is so low that basic human needs can't be met. Poverty-stricken people and families might go without proper housing, clean water, healthy food, and medical attention."(2020).
+According to the results of some studies, children are more than twice as likely to live in poverty than adults Children from the poorest households die at twice the rate of their better-off peers. This project aims to examine the living conditions, economic situation and educational status of children in the world. With this project, it is aimed to point out that child poverty is a huge problem for the world. Also the project examines the connection of these problems with the level of development of the countries according to different data such as mortality, education, nutrition and basic sanitation and water services. 
+
+According to Multidimensional Poverty Index which is specified in surveys of Sustainable Development Solutions Network (SDSN), there are 9 items that are indicators of poverty.  
+*These are*:  
+1.	Adult or child malnourishment  
+2.	Disrupted or curtailed schooling (a minimum of years 1-8)  
+3.	The absence of any household member who has completed 6 years of schooling  
+4.	Child mortality within the household within the last 5 years  
+5.	Lack of access to safe drinking water  
+6.	Lack of access to basic sanitation services  
+7.	Lack of access to clean cooking fuel  
+8.	Lack of basic modern assets (radio, TV, telephone, computer, bike, motorbike, etc.)  
+9.	Lack of access to reliable electricity    
+
+The first 6 items related to child poverty were determined. Thus, topics mentioned in Project Guideline such as “Children”, “Clean water”, “Education”, “Hunger” and “Poverty” have been combined.  
+It is fact that many children do not have access to their basic needs even right to life. According to UNICEF, “across the world, about 1 billion children are multidimensionally poor, meaning they lack necessities as basic as nutrition or clean water”. This project is done to show that this problem is the common problem of all countries and that all countries should work together to end this problem.
+ 
+
+# Project Data & Access to Data 
+
+It was tried to find organizations doing research on children and poverty to find data. It was found some organizations interested in these topics, such as World Health Organization(WHO), Kids Count Data Center and UNICEF. After searching the data, it was considered that the most functional data belongs to UNICEF. That is why data of UNICEF was preffered. There were 6 different Excel spreadsheets we find suitable. These are related to “Child Mortality”, “Education” and “Water, Sanitation and Hygiene”. Also there are a table that separates the countries in the tables according to their regions and development levels.  
+This is the [link](https://data.unicef.org/resources/dataset/sowc-2019-statistical-tables/) to access the data[1].
+
+For the final report, the mortality table, education table and water table were reviewed. A difficulty encountered is that the rows and columns in the data are not compatible. Also, having many empty columns caused missing values after inserting the data to R. Having many headers created difficulties after the data import. Furthermore, it was realized that while the columns with numbers in the data were expected to be numeric, they were actually in character type. This caused some problems in creating the graphics. The following code chunk was used to fix this issue. 
+Although this code chunk gets certain warnings, there could not be found easier way to solve this problem. 
+
+World map data had to be present when creating the map. However, it was difficult to find data with the appropriate number of countries for the data. In addition, although the country numbers of some of the datasets were correct, the geometric data were given incorrectly or incompletely. Finally, a dataset specified in the reference was reached[2].
+
+
+\newpage
+
+# Project Goal & Social Problem Adressed
+
+Poverty, which is one of the main problems of almost every country, is the main issue addressed in the project. In most countries, the child population makes up a third of the population.
+Therefore, in order to determine the poverty level of a country, it would be most logical to first look at the child poverty rate of that country's population. About this topic, UNICEF (2020) emphasize that "Measurement of individual-based child poverty should be based on constitutive rights of poverty"(p.2). Child poverty is the poverty that is caused by the lack of public and private material resources.There are many parameters in this resources to measure child poverty such as access to safe drinking water, right to education, mortality rate, access to basic sanitation services. In the project, it is aimed to both give information about these parameters and calculate the child poverty rate based on those.
+
+
+```{r, include=FALSE}
+
+devtools::install_github("thomasp85/patchwork")
+library(patchwork)
+
+```
+
+
+```{r,include=FALSE}
+library(tidyverse)
+library(tidyr)
+library(dplyr)
+library(readxl)
+library(ggplot2)
+library(sf)
+library(rmarkdown)
+library(leaflet)
+```
+
+
+
+```{r,include=FALSE}
+mortality<-read_excel("data/Table-2-Child-Mortality-EN.xlsx")
+```
+
+
+```{r,include=FALSE}
+dev_data<-read_excel("data/comparedata.xlsx")%>%
+  slice(-c(1))%>%     ##This data is used to pull "development levels" data.
+  select("Development Regions")
+```
+
+```{r,include=FALSE}
+not_all_na <- function(mortality) any(!is.na(mortality) ) ##Function is defined.
+  
+mortality_tidy <-   
+  mortality %>%   
+  filter_all(any_vars(! is.na(.))) %>% ## This code line is used to delete the columns and 
+  select(where(not_all_na)) %>%        ##rows which consist of NA.
+  
+  select(1:4|6:9|13:14) %>%       
+  rename("Countries"="TABLE 2. CHILD MORTALITY",
+         "Under_5_1990"="...2",
+         "Under_5_2000"="...4",
+         "Under_5_2018"="...6",
+         "Under_5_male_rate_2018"="...10",
+         "Under_5_female_rate_2018"="...12",
+         "Infant_1990"="...14",
+         "Infant_2018"="...16",
+         "Dying_5_14_1990"="...24",
+         "Dying_5_14_2018"="...26") %>%
+         slice(c(3:204)) %>%
+         mutate(dev_data,.after="Countries")
+
+```
+
+
+
+```{r,include=FALSE}
+mortality_tidy <- 
+mortality_tidy %>%
+  filter(`Development Regions` != "Not Classified", Countries != "Liechtenstein")
+```
+
+
+
+```{r, include=FALSE, warning=FALSE}
+mortality_tidy[,1] <- as.factor(unlist(mortality_tidy[,1]))
+mortality_tidy[,2] <- as.factor(unlist(mortality_tidy[,2]))
+mortality_tidy[,3] <- as.numeric(unlist(mortality_tidy[,3]))
+mortality_tidy[,4] <- as.numeric(unlist(mortality_tidy[,4]))
+mortality_tidy[,5] <- as.numeric(unlist(mortality_tidy[,5]))
+mortality_tidy[,6] <- as.numeric(unlist(mortality_tidy[,6]))# Wrong structured data is corrected.
+mortality_tidy[,7] <- as.numeric(unlist(mortality_tidy[,7])) 
+mortality_tidy[,8] <- as.numeric(unlist(mortality_tidy[,8]))
+mortality_tidy[,9] <- as.numeric(unlist(mortality_tidy[,9]))
+mortality_tidy[,10] <- as.numeric(unlist(mortality_tidy[,10]))
+mortality_tidy[,11] <- as.numeric(unlist(mortality_tidy[,11]))
+```
+
+
+
+```{r,include=FALSE}
+str(mortality_tidy) ## we can not find easy way to convert numeric values.
+```
+
+
+## Change in Data  
+At this step of the project, a new data is added. By finding a data compatible with the previous data, the development level of the countries was taken. It was thought that it would be efficient to add the development levels of the countries to the previous data by finding a data compatible with the previous data.  
+It can be accessed following [link](https://data.unicef.org/resources/dataset/sowc-2019-statistical-tables/) to data in Out-of-school rates. Other than that, no changes were made.
+
+## Actions Taken
+
+At this step of the project, it was studied on mortality data. The action steps are as follows.  
+*Importing*    
+
+
+1. Mortality data is imported following code chunk.  
+```{r,eval=FALSE}
+mortality<-read_excel("data/Table-2-Child-Mortality-EN.xlsx") 
+```
+
+2. The data which includes column of development regions is imported, and that column is taken.
+
+```{r,eval=FALSE}
+dev_data<-read_excel("data/comparedata.xlsx")%>%
+  slice(-c(1))%>%     
+  select("Development Regions")
+```
+
+*Cleaning & Reshaping* 
+
+
+3. In this step, a function has been written to get rid of columns and rows with all missing values. In addition, columns headings is changed properly. After that, taking the rows with the countries, "Development Regions" column has been added.
+
+```{r,eval=FALSE}
+not_all_na <- function(mortality) any(!is.na(mortality) ) ##Function is defined.
+  
+mortality_tidy <-   
+  mortality %>%   
+  filter_all(any_vars(! is.na(.))) %>% ## This code line is used to delete the columns and 
+  select(where(not_all_na)) %>%        ##rows which consist of NA.
+  
+  select(1:4|6:9|13:14) %>%       
+  rename("Countries"="TABLE 2. CHILD MORTALITY",
+         "Under_5_1990"="...2",
+         "Under_5_2000"="...4",
+         "Under_5_2018"="...6",
+         "Under_5_male_rate_2018"="...10",
+         "Under_5_female_rate_2018"="...12",
+         "Infant_1990"="...14", # Column names have been renamed properly.
+         "Infant_2018"="...16",
+         "Dying_5_14_1990"="...24",
+         "Dying_5_14_2018"="...26") %>%
+         slice(c(3:204)) %>%
+         mutate(dev_data,.after="Countries")# Country data is added to mortality data to compare.
+```
+
+4. Countries with "Not Classified" development level has been removed. Liechtenstein city is also removed.
+
+```{r,eval=FALSE}
+mortality_tidy <-  
+mortality_tidy %>%
+  filter(`Development Regions` != "Not Classified", Countries != "Liechtenstein")
+```   
+
+
+
+
+*Visualization*  
+
+
+5. While visualizing the data, attention was paid to the use of different graphics.  
+- *The graphs used are:*   
+    - Boxplot    
+    - Pie Chart     
+    - Scatter Graph  
+    - Spatial Mapping
+    
+    
+# Boxplot
+
+
+_*Under-5 Mortality Rate by Years*_
+
+```{r,echo=FALSE,warning=FALSE}
+graph_1990 <-
+mortality_tidy %>%
+  ggplot(aes(x=`Development Regions`,y=Under_5_1990)) +
+  geom_boxplot(fill="#34967d") +
+  labs(x = "Development Levels", y = "Deaths",
+       title = "Under-5 Mortality Rate in 1990 (per 1000 live births)")+
+   theme(axis.title =element_text(size = 15, color = "#ad4e4e", face = "italic"),
+         axis.text = element_text(size = 11, color = "#616d77", face="bold"),
+         plot.title = element_text(size = 15, color="#8f3d3e" ,face = "italic"),
+         panel.background = element_rect(fill="coral"),
+         plot.background = element_rect(fill="#cedfd5"))
+ 
+
+graph_1990
+```
+
+  
+  
+This graph shows that under-5 mortality rates(per 1000 live births) in 1990 of countries according to their level of development. It can be figured out from the graph that rates of the countries are low in direct proportion to the development level of the countries. While it is clear that there is a problem about children mortality, especially rates of least developed countries are higher. 
+
+```{r, echo=FALSE,warning=FALSE}
+graph_2000 <-
+mortality_tidy %>%
+  ggplot(aes(x=`Development Regions`,y=Under_5_2000)) +
+  geom_boxplot(fill="#c27769") +
+  labs(x = "Development Levels", y = "Deaths",
+       title = "Under-5 Mortality Rate in 2000 (per 1000 live births)")+
+   theme(axis.title =element_text(size = 15, color = "#ad4e4e", face = "italic"),
+         axis.text = element_text(size = 11, color = "#616d77", face="bold"),
+         plot.title = element_text(size = 15, color="#8f3d3e" ,face = "italic"),
+          panel.background = element_rect(fill="#4c9296"),
+          plot.background = element_rect(fill="#cedfd5"))
+
+graph_2000
+```
+
+  
+Also, this graph shows that under-5 mortality rates(per 1000 live births) in 2000 of countries according to their level of development. As can be seen from the graph, deaths in 2000 are less than in 1990. The relationship between development levels and deaths is the same as in the other graph.
+
+
+```{r,echo=FALSE,warning=FALSE}
+graph_2018 <-
+mortality_tidy %>%
+  ggplot(aes(x=`Development Regions`,y=Under_5_2018)) +
+  geom_boxplot(fill="#694990") +
+  labs(x = "Development Levels", y = "Deaths",
+       title = "Under-5 Mortality Rate in 2018 (per 1000 live births)") +
+   theme(axis.title =element_text(size = 15, color = "#ad4e4e", face = "italic"),
+         axis.text = element_text(size = 11, color = "#616d77", face="bold"),
+         plot.title = element_text(size = 15, color="#8f3d3e" ,face = "italic"),
+          panel.background = element_rect(fill="#F5B041"),
+          plot.background = element_rect(fill="#cedfd5"))
+
+graph_2018
+```
+  
+In addition, this graph shows that under-5 mortality rates(per 1000 live births) in 2018 of countries according to their level of development. Deaths in 2018 are less than in previous years.
+According to three graphs, it can be said that mortality rates have decreased for all developmental levels. This situation may be due to the development of the health sector and technology over time even in least countries. Furthermore, mortality rates in less developed countries are higher than in other countries. This can be explained by poor children's lack of access to food, health care and clean water facilities.
+
+```{r,include=FALSE}
+mort_1<-mortality_tidy %>%
+  group_by(`Development Regions`) %>%
+  summarise(n =n(),
+            avg_Under_5_1990=round(mean(Under_5_1990, na.rm=TRUE),2),
+            avg_Under_5_2000=round(mean(Under_5_2000,na.rm=TRUE),2),
+            avg_Under_5_2018=round(mean(Under_5_2018,na.rm=TRUE),2),
+            avg_Under_5_male=round(mean(Under_5_male_rate_2018, na.rm=TRUE),2),
+            avg_Under_5_female=round(mean(Under_5_female_rate_2018, na.rm=TRUE),2))
+```
+
+
+\newpage
+
+
+# Pie Chart
+
+
+### Under-5 Mortality Rate by Gender  
+
+```{r,echo=FALSE}
+pie1<-ggplot(mort_1,aes(x="",y=avg_Under_5_female,fill=`Development Regions`))+
+  geom_bar(width=0.7,stat="identity")+
+   labs(y="y", title="Mean of Under-5 Female Mortality" ,subtitle="(deaths per 1000 live births)")+
+  theme(plot.title = element_text(size = 14, color="red",face = "bold" )) +
+  geom_label(aes(label=avg_Under_5_female),
+             position = position_stack(vjust = 0.5),
+             show.legend = FALSE) +
+  scale_fill_brewer(palette="PuRd")+
+  theme_void() +
+  coord_polar(theta = "y") 
+  
+
+pie2<-ggplot(mort_1,aes(x="",y=avg_Under_5_male,fill=`Development Regions`))+
+  geom_bar(width=0.7,stat="identity")+
+   labs(y="y", title="Mean of Under-5 Male Mortality" ,subtitle="(deaths per 1000 live births)")+
+  theme(plot.title = element_text(size = 14, color="red",face = "bold" )) +
+  geom_label(aes(label=avg_Under_5_male),
+             position = position_stack(vjust = 0.5),
+             show.legend = FALSE) +
+  scale_fill_brewer(palette="Blues")+
+  theme_void() +
+  coord_polar(theta = "y")
+pie1 +pie2
+```
+
+These two graphs show that under-5 mortality rates(per 1000 live births) by gender in 2018 of countries according to their level of development. As seen in the graphs, rates for both sexes are higher in countries with low level of development. In addition, it is a fact that male mortality rates are higher than female mortality rates, regardless of the level of development. However, the fact that death rates in developed countries are close to each other for men and women is an important indicator of poverty.
+
+
+\newpage
+
+
+# Scatter Graph
+
+
+### Under-5 Mortality Rate in Least Developed Countries
+
+
+```{r, echo=FALSE}
+least_graph1<-
+  mortality_tidy %>%
+  filter(`Development Regions` == "Least Developed") %>%
+  mutate(`Countries`=fct_reorder(`Countries`,Under_5_1990))%>%
+  ggplot(aes(Under_5_1990,`Countries`))+
+  labs(y="Least Developed Countries",x="Mortality Rate",
+       title="Under-5 Mortality Rate in 1990",
+       subtitle="(deaths per 1000 live)")+
+  geom_point(color="turquoise4",shape=19) +
+  theme(axis.text.x = element_text(size=11,face="bold",color="#aa5a4f"),
+        axis.text.y = element_text(size=5,face="bold",color="#aa5a4f"),
+        axis.line.x = element_line(color="black"),
+        axis.line.y = element_line(color="black"),
+        axis.title.y=element_text(color="darkslategrey"),
+        axis.title.x=element_text(color="gray42"),
+        plot.title=element_text(color="#407328",hjust=0.5,size=16),
+        plot.subtitle=element_text(color="#407328",hjust=0.5,size=16),
+        panel.background = element_rect(fill="#C8BA5B"),
+        plot.background = element_rect(fill="#cedfd5"))+
+  scale_x_continuous(breaks=seq(0,400,20))
+
+least_graph1
+```
+
+
+
+```{r, echo=FALSE}
+least_graph2<-mortality_tidy %>%
+  filter(`Development Regions` == "Least Developed") %>%
+  mutate(`Countries`=fct_reorder(`Countries`,Under_5_2000))%>%
+  ggplot(aes(Under_5_2000,`Countries`))+
+  labs(y="Least Developed Countries",x="Mortality Rate",
+       title="Under-5 Mortality Rate in 2000",
+       subtitle="(deaths per 1000 live)")+
+  geom_point(color="turquoise4",shape=19) +
+  theme(axis.text.x = element_text(size=11,face="bold",color="purple4"),
+        axis.text.y = element_text(size=5,face="bold",color="purple4"),
+        axis.line.x = element_line(color="black"),
+        axis.line.y = element_line(color="black"),
+        axis.title.y=element_text(color="tan3"),
+        axis.title.x=element_text(color="gray42"),
+        plot.title=element_text(color="#012E96",hjust=0.5,size=16),
+        plot.subtitle=element_text(color="#012E96",hjust=0.5,size=16),
+           panel.background = element_rect(fill="#C8BA5B"),
+          plot.background = element_rect(fill="#cedfd5"))+
+  scale_x_continuous(breaks=seq(0,400,20))
+
+least_graph2
+```
+
+
+
+
+
+
+```{r, echo=FALSE}
+least_graph3<-mortality_tidy %>%
+  filter(`Development Regions` == "Least Developed") %>%
+  mutate(`Countries`=fct_reorder(`Countries`,Under_5_2018))%>%
+  ggplot(aes(Under_5_2018,`Countries`))+
+  labs(y="Least Developed Countries",x="Mortality Rate",
+       title="Under-5 Mortality Rate in 2018",
+       subtitle="(deaths per 1000 live)")+
+  geom_point(color="turquoise4",shape=19) +
+  theme(axis.text.x = element_text(size=11,face="bold",color="orangered4"),
+        axis.text.y = element_text(size=5,face="bold",color="orangered4"),
+        axis.line.x = element_line(color="black"),
+        axis.line.y = element_line(color="black"),
+        axis.title.y=element_text(color="tan3"),
+        axis.title.x=element_text(color="gray42"),
+        plot.title=element_text(color="seagreen4",hjust=0.5,size=16),
+        plot.subtitle=element_text(color="seagreen4",hjust=0.5,size=16),
+        panel.background = element_rect(fill="#C8BA5B"),
+        plot.background = element_rect(fill="#cedfd5") )+
+  scale_x_continuous(breaks=seq(0,400,20))
+
+least_graph3
+``` 
+
+
+Specifically, under-5 Mortality rate of the least developed countries are examined in the 3 charts above. As can be seen from the 3 graphs above, the death rate per thousand in children is very high in least developed countries. Also, it can be observed that the death rate has decreased over the years.
+
+
+
+### Under-5 Mortality Rate in More Developed Countries
+```{r, echo=FALSE}
+
+more_graph_1<-
+  mortality_tidy %>%
+  filter(`Development Regions` == "More Developed") %>%
+  mutate(`Countries`=fct_reorder(`Countries`,Under_5_1990))%>%
+  ggplot(aes(Under_5_1990,`Countries`))+
+  labs(y="More Developed Countries",x="Mortality Rate",
+       title="Under-5 Mortality Rate in 1990",
+       subtitle="(deaths per 1000 live)")+
+  geom_point(color="#D16C1E",shape=19) +
+  theme(axis.text.x = element_text(size=11,face="bold",color="#0E6655"),
+        axis.text.y = element_text(size=5,face="bold",color="#0E6655"),
+        axis.line.x = element_line(color="black"),
+        axis.line.y = element_line(color="black"),
+        axis.title.y=element_text(color="darkslategrey"),
+        axis.title.x=element_text(color="gray42"),
+        plot.title=element_text(color="#7B241C",hjust=0.5,size=16),
+        plot.subtitle=element_text(color="#7B241C",hjust=0.5,size=16),
+         panel.background = element_rect(fill="#BFC9CA"),
+        plot.background = element_rect(fill="#cedfd5") )+
+  scale_x_continuous(breaks=seq(0,400,5))
+
+more_graph_1
+```
+
+```{r, echo=FALSE}
+
+more_graph_2<-
+  mortality_tidy %>%
+  filter(`Development Regions` == "More Developed") %>%
+  mutate(`Countries`=fct_reorder(`Countries`,Under_5_2000))%>%
+  ggplot(aes(Under_5_2000,`Countries`))+
+  labs(y="More Developed Countries",x="Mortality Rate",
+       title="Under-5 Mortality Rate in 2000",
+       subtitle="(deaths per 1000 live)")+
+  geom_point(color="#D16C1E",shape=19) +
+  theme(axis.text.x = element_text(size=11,face="bold",color="#0E6655"),
+        axis.text.y = element_text(size=5,face="bold",color="#0E6655"),
+        axis.line.x = element_line(color="black"),
+        axis.line.y = element_line(color="black"),
+        axis.title.y=element_text(color="darkslategrey"),
+        axis.title.x=element_text(color="gray42"),
+        plot.title=element_text(color="#7B241C",hjust=0.5,size=16),
+        plot.subtitle=element_text(color="#7B241C",hjust=0.5,size=16),
+         panel.background = element_rect(fill="#BFC9CA"),
+        plot.background = element_rect(fill="#cedfd5") )+
+  scale_x_continuous(breaks=seq(0,400,5))
+
+more_graph_2
+```
+
+```{r, echo=FALSE}
+
+more_graph_3<-
+  mortality_tidy %>%
+  filter(`Development Regions` == "More Developed") %>%
+  mutate(`Countries`=fct_reorder(`Countries`,Under_5_2018))%>%
+  ggplot(aes(Under_5_2018,`Countries`))+
+  labs(y="More Developed Countries",x="Mortality Rate",
+       title="Under-5 Mortality Rate in 2018",
+       subtitle="(deaths per 1000 live)")+
+  geom_point(color="#D16C1E",shape=19) +
+  theme(axis.text.x = element_text(size=11,face="bold",color="#0E6655"),
+        axis.text.y = element_text(size=5,face="bold",color="#0E6655"),
+        axis.line.x = element_line(color="black"),
+        axis.line.y = element_line(color="black"),
+        axis.title.y=element_text(color="darkslategrey"),
+        axis.title.x=element_text(color="gray42"),
+        plot.title=element_text(color="#7B241C",hjust=0.5,size=16),
+        plot.subtitle=element_text(color="#7B241C",hjust=0.5,size=16),
+         panel.background = element_rect(fill="#BFC9CA"),
+        plot.background = element_rect(fill="#cedfd5") )+
+  scale_x_continuous(breaks=seq(0,100,2))
+
+more_graph_3
+```
+
+ 
+On the other hand, under-5 Mortality rate of the more developed countries are shown in the 3 charts above. The number of child deaths is lower in developed countries than in underdeveloped countries. As can be seen from the values on the x-axis, it has never exceeded 50 in highly developed countries against the values that reach 300 in less developed countries. This reflects very well the relationship between child poverty and the level of development.
+
+
+
+
+```{r,include=FALSE}
+education<-read_excel("data/Table-10-Education-EN.xlsx")
+```
+
+
+```{r,include=FALSE}
+
+education_tidy <-   
+  education %>%   
+  filter_all(any_vars(! is.na(.))) %>% ## This code line is used to delete the columns and 
+  select(where(not_all_na)) %>%
+  select(1,4,5,10:11)%>%
+  rename("Countries"="TABLE 10. EDUCATION",
+         "Out_of_school_primary_male"="...6",
+         "Out_of_school_primary_female"="...8",
+         "Completion_rate_primary_male"="...18",
+         "Completion_rate_primary_female"="...20") %>%
+  slice(c(5:206))%>%
+  mutate(dev_data,.after="Countries")
+```
+
+
+```{r,include=FALSE}
+education_tidy <- 
+education_tidy %>%
+  filter(`Development Regions` != "Not Classified")
+```
+
+
+
+```{r,include=FALSE, warning=FALSE}
+
+education_tidy[,1] <- as.factor(unlist(education_tidy[,1]))
+education_tidy[,2] <- as.factor(unlist(education_tidy[,2]))
+education_tidy[,3] <- as.double(unlist(education_tidy[,3]))
+education_tidy[,4] <- as.double(unlist(education_tidy[,4]))
+education_tidy[,5] <- as.double(unlist(education_tidy[,5]))
+education_tidy[,6] <- as.double(unlist(education_tidy[,6]))
+```
+
+
+
+```{r,include=FALSE} 
+world_data<- st_read("data/world-administrative-boundaries.shp")
+```
+
+```{r,include=FALSE}
+world_data_1<-world_data %>%
+  rename(Countries="name")
+```
+
+
+```{r,include=FALSE}
+world_data_2<-world_data_1 %>%
+  select(Countries) %>%
+  arrange(Countries)
+```
+
+
+```{r,include=FALSE}
+education_tidy <- education_tidy %>%
+  arrange(Countries)
+```
+
+
+```{r,include=FALSE}
+merged_data_1<-merge(world_data_2,education_tidy)
+```
+
+
+## Out-of-School Rate in Primary Education between 2012 and 2018 
+
+```{r,include=FALSE}
+out_of_school_color <- colorFactor(palette=c("#025F06","#579C5A","#88A389"),
+domain= merged_data_1$`Development Regions`, levels = c("More Developed","Less Developed","Least Developed"),ordered = TRUE)
+```
+
+```{r,include=FALSE}
+out_of_school_labels <-sprintf("<strong>%s</strong><br>%s<br>Out of School primary male: %s <br> Out of School primary female:%s",merged_data_1$Countries,merged_data_1$`Development Regions`,merged_data_1$Out_of_school_primary_male,merged_data_1$Out_of_school_primary_female) %>%
+  lapply(htmltools::HTML)
+```
+
+```{r,echo=FALSE}
+out_of_school_map <- merged_data_1 %>% leaflet() %>% 
+  addPolygons(stroke=TRUE,color = "white",weight = 1,label=out_of_school_labels,
+              fillColor = ~out_of_school_color(`Development Regions`),
+              fillOpacity = 0.7)
+out_of_school_map
+```
+
+A map in which the color tone increases according to the development level of the country has been created above. It can be seen that the out-of-school rates in primary school of the countries where the tone is low are high for both genders. From here, it is seen how high the rate of not going to school in underdeveloped countries is compared to developed countries. 
+
+## Completion Rate in Primary Education between 2012 and 2018 
+```{r,include=FALSE}
+completion_color <- colorFactor(palette=c("#08085B","#3F3F9A","#606083"),
+domain= merged_data_1$`Development Regions`, levels = c("More Developed","Less Developed","Least Developed"),ordered = TRUE)
+```
+
+```{r,include=FALSE}
+completion_labels <-sprintf("<strong>%s</strong><br>%s<br>Completion rate of primary male: %s <br> Completion rate of primary female:%s",merged_data_1$Countries,merged_data_1$`Development Regions`,merged_data_1$Completion_rate_primary_male,merged_data_1$Completion_rate_primary_female) %>%
+  lapply(htmltools::HTML)
+```
+
+
+```{r,echo=FALSE}
+completion_map <- merged_data_1 %>% leaflet() %>% 
+  addPolygons(stroke=TRUE,color = "white",weight = 1,label=completion_labels,
+              fillColor = ~completion_color(`Development Regions`),
+              fillOpacity = 0.7)
+completion_map
+```
+
+From this map, it can be observed how the completion rates in primary school change with the level of development.On  contrary, it can be observed from the map above how much the school completion rate increases as the level of development increases.
+
+```{r,include=FALSE}
+wash<-read_excel("data/Table-13-WASH-EN.xlsx")
+```
+
+```{r,include=FALSE}
+not_all_na_wash <- function(wash_tidy) any(!is.na(wash_tidy) ) 
+
+wash_tidy <-   
+  wash %>%   
+  filter_all(any_vars(! is.na(.))) %>% ## This code line is used to delete the columns and 
+  select(where(not_all_na_wash)) %>%        ##rows which consist of NA.
+  
+  select(1,2,5,8) %>%       
+  rename("Countries"="TABLE 13. WASH",
+         "Total_basic_drinking_water_services"="...2",
+         "Total_basic_sanitation_services"="...8",
+         "Total_basic_hygiene_facilities"="...14")%>%
+         slice(c(4:205)) %>%
+         mutate(dev_data,.after="Countries")
+
+```
+
+```{r,include=FALSE}
+wash_tidy <- 
+wash_tidy %>%
+  filter(`Development Regions` != "Not Classified", Countries != "Liechtenstein")
+```
+
+```{r,include=FALSE}
+wash_tidy_1<-wash_tidy%>%
+         filter(`Development Regions` == "Least Developed")
+```
+
+```{r,include=FALSE}
+wash_tidy_2<-wash_tidy%>%
+         filter(`Development Regions` == "More Developed")
+```
+
+
+
+```{r,include=FALSE, warning=FALSE}
+
+wash_tidy_1[,1] <- as.factor(unlist(wash_tidy_1[,1]))
+wash_tidy_1[,2] <- as.factor(unlist(wash_tidy_1[,2]))
+wash_tidy_1[,3] <- as.numeric(unlist(wash_tidy_1[,3]))
+wash_tidy_1[,4] <- as.numeric(unlist(wash_tidy_1[,4]))
+wash_tidy_1[,5] <- as.numeric(unlist(wash_tidy_1[,5]))
+```
+
+```{r,include=FALSE}
+str(wash_tidy_1)
+```
+
+```{r,include=FALSE}
+wash_tidy_1$Total_basic_drinking_water_services<-format(round(wash_tidy_1$Total_basic_drinking_water_services, 1), nsmall = 3)
+```
+
+
+```{r,include=FALSE}
+wash_tidy_1[,3] <- as.numeric(unlist(wash_tidy_1[,3]))
+```
+
+```{r,include=FALSE}
+str(wash_tidy_1)
+```
+
+```{r,include=FALSE, warning=FALSE}
+
+wash_tidy_2[,1] <- as.factor(unlist(wash_tidy_2[,1]))
+wash_tidy_2[,2] <- as.factor(unlist(wash_tidy_2[,2]))
+wash_tidy_2[,3] <- as.numeric(unlist(wash_tidy_2[,3]))
+wash_tidy_2[,4] <- as.numeric(unlist(wash_tidy_2[,4]))
+wash_tidy_2[,5] <- as.numeric(unlist(wash_tidy_2[,5]))
+```
+
+```{r,include=FALSE}
+str(wash_tidy_2)
+```
+
+```{r,include=FALSE}
+wash_tidy_2$Total_basic_drinking_water_services<-format(round(wash_tidy_2$Total_basic_drinking_water_services, 1), nsmall = 3)
+```
+
+
+```{r,include=FALSE}
+wash_tidy_2[,3] <- as.numeric(unlist(wash_tidy_2[,3]))
+```
+
+```{r,include=FALSE}
+str(wash_tidy_1)
+```
+
+# Total Rate of Access to the Clear Water for Least Developed Countries (%)
+
+```{r,echo=FALSE,warning=FALSE}
+wash_least_plot<-ggplot(wash_tidy_1,aes(reorder(Countries,Total_basic_drinking_water_services),
+               Total_basic_drinking_water_services,
+               fill=as.factor(Countries)))+
+    geom_col(color="white")+
+    theme_bw()+
+    coord_flip(clip = "off", expand = FALSE)+
+    guides( fill = FALSE) +
+    labs(title="Total Basic Drinking Water Services for Least Developed Countires", 
+         y="Total water services ", x="Least Developed Countries")+
+     geom_text(fontface = "bold",color="#2B3D5D",size=3,aes(label = paste(Total_basic_drinking_water_services,"")), hjust = 1)+
+    theme(
+    plot.title=element_text(size=11, hjust=0.5, face="bold", colour="#A330D5", vjust=-1),
+    axis.title.y=element_text(color="darkslategrey"),
+    axis.title.x=element_text(color="#6E76F0"),
+    panel.background = element_rect(fill="#EAF0DA"),
+    plot.background = element_rect(fill="#B4F7C7"))
+wash_least_plot
+```
+
+In underdeveloped countries, the rate of access to water drops to values as low as 40%. Hence, this rate is too low for children in these countries to survive. 
+
+
+
+# Total Rate of Access to the Clear Water for More Developed Countries (%)
+
+```{r,echo=FALSE,warning=FALSE}
+wash_more_plot<-ggplot(wash_tidy_2,aes(reorder(Countries,Total_basic_drinking_water_services),
+               Total_basic_drinking_water_services,
+               fill=as.factor(Countries)))+
+    geom_col(color="white")+
+    theme_bw()+
+    coord_flip(clip = "off", expand = FALSE)+
+    guides( fill = FALSE) +
+    labs(title="Total Basic Drinking Water Services for More Developed Countires", 
+         y="Total water services ", x="Least Developed Countries")+
+    
+     geom_text(fontface = "bold",color="#2B3D5D",size=3,aes(label = paste(Total_basic_drinking_water_services,"")), hjust = 1)+
+    theme(
+    plot.title=element_text(size=11, hjust=0.5, face="bold", colour="#A330D5", vjust=-1),
+    axis.title.y=element_text(color="darkslategrey"),
+    axis.title.x=element_text(color="#6E76F0"),
+    panel.background = element_rect(fill="#EAF0DA"),
+    plot.background = element_rect(fill="#B4F7C7"))
+wash_more_plot
+```
+
+The graph above shows that this rate does not fall below 85% in highly developed countries. It can also be seen that the direct proportion of the level of development with the rate of access to water. 
+
+# Results and Discussion
+
+Child poverty is a reality all over the world, as indicated below the graphics. In least developed countries, child mortality rate and out-of-school rate are high. In addition, the rate of access to potable water is low. As the level of development of countries increases, these rates change positively, with exceptions.
+
+As a result of a research of UNICEF, it is observed that all parameters considered in highly developed countries are in good condition compared to less developed countries. The data shared by UNICEF, shown below, on child mortality also coincide with these parameters.
+
+ _*CHILD MORTALITY RATES*_
+ 
+1. MEXICO: 37.6%
+
+2. EL SALVADOR: 78.9%
+
+3. GUATEMALA: 79.9%
+
+4. ALGERIA: 29%
+
+5. NIGERIA: 50.88%
+
+6. SENEGAL: 31%
+
+7. EGYPT: 29.5%
+
+8. TURKEY: 21.37%
+
+9. PAKISTAN: 49%
+
+10. SPAIN: 27%
+
+11. UNITED KINGDOM: 23%
+
+12. INDIA: 60.52%
+
+13. FRANCE: 16%
+
+14. GERMANY: 10%
+
+15. TANZANIA: 97%
+
+16. ZIMBABWE: 90%
+
+17. NIGER: 88.1%
+
+
+As can be seen from the data above, NIGER, one of the countries with the lowest rate of access to clean water, which is one of the graphs used throughout the project, has a very high child poverty rate, while UNITED KINGDOM, one of the countries with the highest value in the graph, is among the countries with the lowest child poverty rate. In addition, the school completion rate of NIGER is 34.8% for men and 23.6% for women, which explains the high rates of child poverty for NIGER.
+
+
+It is obvious that the improvement of even one of these parameters will reduce the poverty rates of the child population, which is expressed as the future of the country. Therefore, policymakers in underdeveloped countries should take this situation into account and urgently should find a solution to this situation. 
+
+
+# Conclusion
+
+To sum up, in this project, it has been worked on mortality, education and water data. Importing, cleaning, mutating, reshaping and visualization steps were applied. Difficulties encountered in the project, the data had too many missing values, the columns were not compatible with the rows and the structure of the columns was not as desired. Although it was difficult to convert the data to the desired format, it was successful. In addition to the interim report, education and water data were analyzed. Also, interactive maps and bar graph has been added. At the end of all these stages, a project was prepared in which sufficient information about child poverty could be obtained.
+
+# References
+[1] [UNICEF Table](https://data.unicef.org/resources/dataset/sowc-2019-statistical-tables/)
+
+[2] [Spatial Data](https://public.opendatasoft.com/explore/dataset/world-administrative-boundaries/export/)
+
+[3] [UNICEF Data Warehouse](https://data.unicef.org/resources/data_explorer/unicef_f/?ag=UNICEF&df=GLOBAL_DATAFLOW&ver=1.0&dq=.ED_15-24_LR..&startPeriod=2016&endPeriod=2022)
+
+[4] [UNICEF Research](https://data.unicef.org/topic/child-poverty/overview/) 
+
+[5] [Graph Implementations](https://ivelasq.rbind.io/blog/other-geoms/)
+
+[6] [Solution of Poverty](https://cpag.org.uk/child-poverty/solutions-poverty)
+
+[7] [Slides with Rmarkdown](https://www.youtube.com/watch?v=3n9nASHg9gc)
+
